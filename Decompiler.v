@@ -189,10 +189,24 @@ Qed.
 
 (*Exercise 4.9*)
 
+Lemma assemble_singleton : forall e stk ins,
+assemble stk ins = [e] -> compile e = concat (map compile (rev stk)) ++ ins.
+Proof.
+  intros. induction ins. {
+    simpl. destruct stk; try discriminate.
+    destruct stk; try discriminate. simpl in H. injection H as H'. subst.
+    simpl. repeat rewrite app_nil_r. reflexivity.
+  } {
+    (* CONOTINUE HERE *)
+  }
+
 Lemma compile_decompile : forall ins e,
 decompile ins = Some e -> compile e = ins.
 Proof.
   intros.
-  induction e; destruct ins; try discriminate. {
-    simpl.
+  unfold decompile in H.
+  destruct assemble eqn:Eass; try discriminate.
+  destruct l; try discriminate.
+  injection H as H'. subst.
+  induction e. {
   }
