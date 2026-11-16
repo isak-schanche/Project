@@ -137,13 +137,10 @@ Qed.
 
 Lemma vm_correct : forall e, vm (compile e) = Some (eval e).
 Proof.
-  induction e. {
-    reflexivity.
-  } {
-    destruct u; simpl; unfold vm; rewrite run_composite; reflexivity.
-  } {
-    destruct b; simpl; unfold vm; rewrite run_composite; rewrite run_composite; reflexivity.
-  }
+  induction e; try reflexivity; [
+    destruct u |
+    destruct b
+  ]; simpl; unfold vm; repeat rewrite run_composite; reflexivity.
 Qed.
 
 (* Exercise 4.7 *)
@@ -157,7 +154,7 @@ Fixpoint assemble (stk : list exp) (instrs : list instruction) : list exp :=
     | _ => []
     end
   | (IBinOp op)::instrs' => match stk with
-    | n1 :: n2 :: stk' => assemble ((EBinOp op n1 n2) :: stk') instrs'
+    | n1 :: n2 :: stk' => assemble ((EBinOp op n2 n1) :: stk') instrs'
     | _ => []
     end
   end.
@@ -169,4 +166,33 @@ Definition decompile : list instruction -> option exp := fun instrs =>
   end.
 
 (* Exercise 4.8 *)
+
+Lemma assemble_composite : forall e instrs' stk, assemble stk (compile e ++ instrs') = assemble (e :: stk) instrs'.
+Proof.
+  intros e.
+  induction e; intros. {
+    reflexivity.
+  } {
+    destruct u; simpl; rewrite <- app_assoc; rewrite IHe; reflexivity.
+  } {
+    destruct b; simpl; rewrite <- app_assoc; rewrite <- app_assoc; rewrite IHe1; rewrite IHe2; reflexivity.
+  }
+Qed.
+
 Lemma decompile_correct : forall e, decompile (compile e) = Some e.
+Proof.
+  induction e; try reflexivity; [
+    destruct u |
+    destruct b
+  ]; simpl; unfold decompile; repeat rewrite assemble_composite; reflexivity.
+Qed.
+
+(*Exercise 4.9*)
+
+Lemma compile_decompile : forall ins e,
+decompile ins = Some e -> compile e = ins.
+Proof.
+  intros.
+  induction e; destruct ins; try discriminate. {
+    simpl.
+  }
