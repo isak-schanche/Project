@@ -95,8 +95,8 @@ Fixpoint run (stk : list nat) (instrs : list instruction) : list nat :=
 
 Definition vm : list instruction -> option nat := fun instrs =>
   match (run [] instrs) with
-  | n :: _ => Some n
-  | [] => None
+  | n :: nil => Some n
+  | _ => None
   end.
 
 (*Exercise 4.5*)
@@ -145,3 +145,28 @@ Proof.
     destruct b; simpl; unfold vm; rewrite run_composite; rewrite run_composite; reflexivity.
   }
 Qed.
+
+(* Exercise 4.7 *)
+
+Fixpoint assemble (stk : list exp) (instrs : list instruction) : list exp :=
+  match instrs with
+  | [] => stk
+  | (IPush n)::instrs' => assemble ((ENat n)::stk) instrs'
+  | (IUnOp op)::instrs' => match stk with
+    | n :: stk' => assemble ((EUnOp op n) :: stk') instrs'
+    | _ => []
+    end
+  | (IBinOp op)::instrs' => match stk with
+    | n1 :: n2 :: stk' => assemble ((EBinOp op n1 n2) :: stk') instrs'
+    | _ => []
+    end
+  end.
+
+Definition decompile : list instruction -> option exp := fun instrs => 
+  match (assemble [] instrs) with
+  | e :: nil => Some e
+  | _ => None
+  end.
+
+(* Exercise 4.8 *)
+Lemma decompile_correct : forall e, decompile (compile e) = Some e.
