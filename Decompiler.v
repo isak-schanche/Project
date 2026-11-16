@@ -73,8 +73,8 @@ Definition eval_unop (o : unop) (n : nat) : nat :=
 
 Definition eval_binop (o : binop) (n1 : nat) (n2 : nat) :=
   match o with
-  | OPlus => n1 + n2
-  | OMult => n1 * n2
+  | OPlus => n2 + n1
+  | OMult => n2 * n1
   end.
 
 Fixpoint run (stk : list nat) (instrs : list instruction) : list nat :=
@@ -123,51 +123,25 @@ Proof. reflexivity. Qed.
 
 (*Exercise 4.6*)
 
-Lemma hi : forall e instrs, vm (compile e) = Some (eval e) -> vm (compile e ++ instrs) = vm ([IPush (eval e)] ++ instrs).
+Lemma run_composite : forall e instrs' stk, run stk (compile e ++ instrs') = run ((eval e) :: stk) instrs'.
 Proof.
-  intros.
-  generalize dependent instrs.
+  intros e.
   induction e; intros. {
     reflexivity.
-  }{
-    destruct u; simpl. {
-      
-    }
+  } {
+    destruct u; simpl; rewrite <- app_assoc; rewrite IHe; reflexivity.
+  } {
+    destruct b; simpl; rewrite <- app_assoc; rewrite <- app_assoc; rewrite IHe1; rewrite IHe2; reflexivity.
   }
-
-(* Lemma vm_eval : forall instrs op,
-  vm (instrs ++ [IUnOp op]) =
-  match (vm instrs) with
-  | None => None
-  | Some e => Some (eval_unop op e)
-  end.
-Proof.
-  induction op. {
-    simpl.
-    destruct (vm instrs) eqn:evm. {
-      induction instrs. {
-        unfold vm in evm.
-        simpl in evm.
-        discriminate.
-      }{
-        simpl.
-        unfold vm.
-        simpl.
-        destruct a; try discriminate.
-        
-      }
-    }
-  } *)
+Qed.
 
 Lemma vm_correct : forall e, vm (compile e) = Some (eval e).
 Proof.
   induction e. {
-    unfold vm.
-    simpl.
     reflexivity.
-  }{
-    destruct u. {
-      simpl.
-      
-    }
+  } {
+    destruct u; simpl; unfold vm; rewrite run_composite; reflexivity.
+  } {
+    destruct b; simpl; unfold vm; rewrite run_composite; rewrite run_composite; reflexivity.
   }
+Qed.
