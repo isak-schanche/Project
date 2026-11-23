@@ -189,16 +189,50 @@ Qed.
 
 (*Exercise 4.9*)
 
+Lemma map_concat {T1 T2 : Type}: forall (f : T1 -> T2) a b,
+  map f (a ++ [b]) = (map f a) ++ [f b].
+Proof.
+  intros. induction a. {
+    reflexivity.
+  } {
+    simpl. rewrite IHa. reflexivity.
+  }
+Qed.
+
 Lemma assemble_singleton : forall e stk ins,
 assemble stk ins = [e] -> compile e = concat (map compile (rev stk)) ++ ins.
 Proof.
-  intros. induction ins. {
+  intros. generalize dependent stk. induction ins; intros. {
     simpl. destruct stk; try discriminate.
     destruct stk; try discriminate. simpl in H. injection H as H'. subst.
     simpl. repeat rewrite app_nil_r. reflexivity.
   } {
-    (* CONOTINUE HERE *)
+    destruct a. {
+      simpl in H. apply IHins in H.
+      simpl in H. rewrite map_concat in H. simpl in H. rewrite concat_app in H.
+      simpl in H. rewrite <- app_assoc in H. simpl in H.
+      assumption.
+    } {
+      destruct stk; try discriminate.
+      simpl in H. apply IHins in H.
+      simpl in H. rewrite map_concat in H. simpl in H. rewrite concat_app in H.
+      simpl in H. rewrite app_nil_r in H. rewrite <- app_assoc in H.
+      rewrite <- app_assoc in H. simpl in H.
+      simpl. rewrite map_concat. rewrite concat_app. simpl. rewrite app_nil_r.
+      rewrite <- app_assoc.
+      assumption.
+    } {
+      destruct stk; try discriminate. destruct stk; try discriminate.
+      simpl in H. apply IHins in H.
+      simpl in H. rewrite map_concat in H. simpl in H. rewrite concat_app in H.
+      simpl in H. rewrite app_nil_r in H. rewrite <- app_assoc in H.
+      rewrite <- app_assoc in H. rewrite <- app_assoc in H. simpl in H.
+      simpl. rewrite map_concat. rewrite map_concat. rewrite concat_app. rewrite concat_app.
+      simpl. rewrite app_nil_r. rewrite app_nil_r. rewrite <- app_assoc. rewrite <- app_assoc.
+      assumption.
+    }
   }
+Qed.
 
 Lemma compile_decompile : forall ins e,
 decompile ins = Some e -> compile e = ins.
@@ -208,5 +242,6 @@ Proof.
   destruct assemble eqn:Eass; try discriminate.
   destruct l; try discriminate.
   injection H as H'. subst.
-  induction e. {
-  }
+  induction e;
+  apply assemble_singleton in Eass; simpl; simpl in Eass; assumption.
+Qed.
