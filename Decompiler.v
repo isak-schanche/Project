@@ -238,52 +238,49 @@ Qed.
 
 (*Abstraction*)
 
-
+Class Algebra (T : Type) := {
+  apply_const : nat -> T ;
+  apply_unop : unop -> T -> T ;
+  apply_binop : binop -> T -> T -> T ;
+}.
 
 Fixpoint trans {T} `{Algebra T} (stk : list T) (instrs : list instruction) : list T :=
   match instrs with
     | [] => stk
-    | (IPush n) :: instrs' => trans alg ((apply_const n) :: stk) instrs'
+    | (IPush n) :: instrs' => trans ((apply_const n) :: stk) instrs'
     | (IUnOp op) :: instrs' =>
       match stk with
-      | n :: stk' => trans alg ((alg.(apply_unop) op n) :: stk') instrs'
+      | n :: stk' => trans ((apply_unop op n) :: stk') instrs'
       | _ => []
       end
     | (IBinOp op) :: instrs' =>
       match stk with
-      | n1 :: n2 :: stk' => trans alg ((alg.(apply_binop) op n1 n2) :: stk') instrs'
+      | n1 :: n2 :: stk' => trans ((apply_binop op n1 n2) :: stk') instrs'
       | _ => []
       end
     end.
 
-  Class Algebra (T : Type) := {
-  apply_const : nat -> T ;
-  apply_unop : unop -> T -> T ;
-  apply_binop : binop -> T -> T -> T ;
-  trans_composite : trans alg stk (compile e ++ instrs') = trans alg (e :: stk) instrs'
+Instance vm_alg : Algebra nat := {
+  apply_const n := n ;
+  apply_unop op n := eval_unop op n ;
+  apply_binop op n1 n2 := eval_binop op n1 n2
 }.
 
-Definition interpret {T} (alg : @Algebra T) : list instruction -> option T := fun instrs =>
-  match (trans alg [] instrs) with
+Instance decompile_alg : Algebra exp := {
+  apply_const n := ENat n ;
+  apply_unop op n := EUnOp op n ;
+  apply_binop op n1 n2 := EBinOp op n2 n1
+}.
+
+Definition interpret {T} `{Algebra T} : list instruction -> option T := fun instrs =>
+  match (trans [] instrs) with
   | x :: nil => Some x
   | _ => None
   end.
 
-Definition nat_alg : Algebra :={|
-  apply_const n := n ;
-  apply_unop op n := eval_unop op n ;
-  apply_binop op n1 n2 := eval_binop op n1 n2
-|}.
 
-Definition exp_alg : Algebra :={|
-  apply_const n := ENat n ;
-  apply_unop op n := EUnOp op n ;
-  apply_binop op n1 n2 := EBinOp op n1 n2
-|}.
-
-Lemma trans_composite : forall e alg instrs' stk,
-  alg = nat_alg \/ alg = exp_alg ->
-  trans alg stk (compile e ++ instrs') = trans alg (e :: stk) instrs'.
+Lemma trans_composite {T} `{Algebra T} : forall e instrs' stk,
+  trans stk (compile e ++ instrs') = trans (e :: stk) instrs'.
 Proof.
   intros e.
   induction e; intros. {
@@ -295,22 +292,10 @@ Proof.
   }
 Qed.
 
-Lemma interpret_correct : forall e, decompile (compile e) = Some e.
+Lemma interpret_correct {T} `{Algebra T} : forall e, interpret (compile e) = Some e.
 Proof.
   induction e; try reflexivity; [
     destruct u |
     destruct b
-  ]; simpl; unfold decompile; repeat rewrite assemble_composite; reflexivity.
+  ]; simpl; unfold interpret; repeat rewrite trans_composite; reflexivity.
 Qed.
-
-Definition vm : list instruction -> option nat := fun instrs =>
-  match (run [] instrs) with
-  | n :: nil => Some n
-  | _ => None
-  end.
-
-Definition decompile : list instruction -> option exp := fun instrs => 
-  match (assemble [] instrs) with
-  | e :: nil => Some e
-  | _ => None
-  end.
