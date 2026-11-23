@@ -87,7 +87,7 @@ Fixpoint run (stk : list nat) (instrs : list instruction) : list nat :=
     end
   end.
 
-Definition vm : list instruction -> option nat := fun instrs =>
+Definition vm (instrs : list instruction): option nat :=
   match (run [] instrs) with
   | n :: nil => Some n
   | _ => None
@@ -124,9 +124,9 @@ Proof.
   induction e; intros. {
     reflexivity.
   } {
-    destruct u; simpl; rewrite <- app_assoc; rewrite IHe; reflexivity.
+    simpl; rewrite <- app_assoc; rewrite IHe; reflexivity.
   } {
-    destruct b; simpl; rewrite <- app_assoc; rewrite <- app_assoc; rewrite IHe1; rewrite IHe2; reflexivity.
+    simpl; rewrite <- app_assoc; rewrite <- app_assoc; rewrite IHe1; rewrite IHe2; reflexivity.
   }
 Qed.
 
@@ -154,7 +154,7 @@ Fixpoint assemble (stk : list exp) (instrs : list instruction) : list exp :=
     end
   end.
 
-Definition decompile : list instruction -> option exp := fun instrs => 
+Definition decompile (instrs : list instruction) : option exp :=
   match (assemble [] instrs) with
   | e :: nil => Some e
   | _ => None
@@ -169,9 +169,9 @@ Proof.
   induction e; intros. {
     reflexivity.
   } {
-    destruct u; simpl; rewrite <- app_assoc; rewrite IHe; reflexivity.
+    simpl; rewrite <- app_assoc; rewrite IHe; reflexivity.
   } {
-    destruct b; simpl; rewrite <- app_assoc; rewrite <- app_assoc; rewrite IHe1; rewrite IHe2; reflexivity.
+    simpl; rewrite <- app_assoc; rewrite <- app_assoc; rewrite IHe1; rewrite IHe2; reflexivity.
   }
 Qed.
 
@@ -238,13 +238,13 @@ Qed.
 
 (*Abstraction*)
 
-Class Algebra (T : Type) := {
+Class TransAlgebra (T : Type) := {
   apply_const : nat -> T ;
   apply_unop : unop -> T -> T ;
   apply_binop : binop -> T -> T -> T ;
 }.
 
-Fixpoint trans {T} `{Algebra T} (stk : list T) (instrs : list instruction) : list T :=
+Fixpoint trans {T} `{TransAlgebra T} (stk : list T) (instrs : list instruction) : list T :=
   match instrs with
     | [] => stk
     | (IPush n) :: instrs' => trans ((apply_const n) :: stk) instrs'
@@ -260,37 +260,45 @@ Fixpoint trans {T} `{Algebra T} (stk : list T) (instrs : list instruction) : lis
       end
     end.
 
-Instance vm_alg : Algebra nat := {
+Class Algebra (T : Type) `{TransAlgebra T} := {
+  alg_eval : exp -> T ;
+  trans_composite : forall e instrs' stk,
+    trans stk (compile e ++ instrs') = trans ((alg_eval e) :: stk) instrs'
+}.
+
+Ltac trans_composite_proof :=
+intros e; induction e as [ n | u e IHe | b e1 IHe1 e2 IHe2]; intros;
+    [ reflexivity
+    | simpl; rewrite <- app_assoc; rewrite IHe; reflexivity
+    | simpl; rewrite <- app_assoc; rewrite <- app_assoc;
+      rewrite IHe1; rewrite IHe2; reflexivity
+    ].
+
+Instance trans_nat_alg : TransAlgebra nat := {
   apply_const n := n ;
   apply_unop op n := eval_unop op n ;
-  apply_binop op n1 n2 := eval_binop op n1 n2
+  apply_binop op n1 n2 := eval_binop op n1 n2 ;
+}.
+Instance nat_alg : Algebra nat := {
+  alg_eval := eval ;
+  trans_composite := ltac:(trans_composite_proof)
 }.
 
-Instance decompile_alg : Algebra exp := {
+Instance trans_exp_alg : TransAlgebra exp := {
   apply_const n := ENat n ;
   apply_unop op n := EUnOp op n ;
-  apply_binop op n1 n2 := EBinOp op n2 n1
+  apply_binop op n1 n2 := EBinOp op n2 n1 ;
+}.
+Instance exp_alg : Algebra exp := {
+  alg_eval e := e ;
+  trans_composite := ltac:(trans_composite_proof)
 }.
 
-Definition interpret {T} `{Algebra T} : list instruction -> option T := fun instrs =>
+Definition interpret {T} `{Algebra T} (instrs : list instruction) : option T :=
   match (trans [] instrs) with
   | x :: nil => Some x
   | _ => None
   end.
-
-
-Lemma trans_composite {T} `{Algebra T} : forall e instrs' stk,
-  trans stk (compile e ++ instrs') = trans (e :: stk) instrs'.
-Proof.
-  intros e.
-  induction e; intros. {
-    reflexivity.
-  } {
-    destruct u; simpl; rewrite <- app_assoc; rewrite IHe; reflexivity.
-  } {
-    destruct b; simpl; rewrite <- app_assoc; rewrite <- app_assoc; rewrite IHe1; rewrite IHe2; reflexivity.
-  }
-Qed.
 
 Lemma interpret_correct {T} `{Algebra T} : forall e, interpret (compile e) = Some e.
 Proof.
@@ -299,3 +307,9 @@ Proof.
     destruct b
   ]; simpl; unfold interpret; repeat rewrite trans_composite; reflexivity.
 Qed.
+
+Definition vm' := @interpret nat _ _.
+Definition decompile' := @interpret exp _ _.
+
+Compute (vm' example_2_compiled).
+Compute (decompile' example_2_compiled).
