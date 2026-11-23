@@ -207,30 +207,22 @@ Proof.
     destruct stk; try discriminate. simpl in H. injection H as H'. subst.
     simpl. repeat rewrite app_nil_r. reflexivity.
   } {
-    destruct a. {
-      simpl in H. apply IHins in H.
-      simpl in H. rewrite map_concat in H. simpl in H. rewrite concat_app in H.
-      simpl in H. rewrite <- app_assoc in H. simpl in H.
-      assumption.
-    } {
-      destruct stk; try discriminate.
-      simpl in H. apply IHins in H.
-      simpl in H. rewrite map_concat in H. simpl in H. rewrite concat_app in H.
-      simpl in H. rewrite app_nil_r in H. rewrite <- app_assoc in H.
-      rewrite <- app_assoc in H. simpl in H.
-      simpl. rewrite map_concat. rewrite concat_app. simpl. rewrite app_nil_r.
-      rewrite <- app_assoc.
-      assumption.
-    } {
-      destruct stk; try discriminate. destruct stk; try discriminate.
-      simpl in H. apply IHins in H.
-      simpl in H. rewrite map_concat in H. simpl in H. rewrite concat_app in H.
-      simpl in H. rewrite app_nil_r in H. rewrite <- app_assoc in H.
-      rewrite <- app_assoc in H. rewrite <- app_assoc in H. simpl in H.
-      simpl. rewrite map_concat. rewrite map_concat. rewrite concat_app. rewrite concat_app.
-      simpl. rewrite app_nil_r. rewrite app_nil_r. rewrite <- app_assoc. rewrite <- app_assoc.
-      assumption.
-    }
+    destruct a;
+    [|
+      destruct stk; try discriminate |
+      destruct stk; try discriminate; destruct stk; try discriminate
+    ];
+    apply IHins in H;
+    simpl in H; rewrite map_concat in H; rewrite concat_app in H; simpl in H;
+    [|
+      rewrite app_nil_r in H; rewrite <- app_assoc in H..
+    ];
+    repeat (rewrite <- app_assoc in H);
+    [|
+      simpl; repeat (rewrite map_concat, concat_app);
+      simpl; repeat(rewrite app_nil_r, <- app_assoc)..
+    ];
+    assumption.
   }
 Qed.
 
@@ -243,5 +235,5 @@ Proof.
   destruct l; try discriminate.
   injection H as H'. subst.
   induction e;
-  apply assemble_singleton in Eass; simpl; simpl in Eass; assumption.
+  apply assemble_singleton in Eass; assumption.
 Qed.
