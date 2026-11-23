@@ -10,19 +10,25 @@ Inductive exp :=
 
 (*Exercise 4.1*)
 
+Definition eval_unop (o : unop) (n : nat) : nat :=
+  match o with
+  | OSucc => S n
+  | OPred => pred n
+  end.
+
+Definition eval_binop (o : binop) (n1 : nat) (n2 : nat) :=
+  match o with
+  | OPlus => n2 + n1
+  | OMult => n2 * n1
+  end.
+
 Fixpoint eval (e : exp) : nat :=
   match e with
   | ENat n => n
   | EUnOp o e =>
-    match o with
-    | OSucc => S (eval e)
-    | OPred => pred (eval e)
-    end
+    eval_unop o (eval e)
   | EBinOp o e1 e2 =>
-    match o with
-    | OPlus => eval e1 + eval e2
-    | OMult => eval e1 * eval e2
-    end
+    eval_binop o (eval e2) (eval e1)
   end.
 
 (*Exercise 4.2*)
@@ -64,18 +70,6 @@ Fixpoint compile (e : exp) : list instruction :=
   end.
 
 (*Exercise 4.4*)
-
-Definition eval_unop (o : unop) (n : nat) : nat :=
-  match o with
-  | OSucc => S n
-  | OPred => pred n
-  end.
-
-Definition eval_binop (o : binop) (n1 : nat) (n2 : nat) :=
-  match o with
-  | OPlus => n2 + n1
-  | OMult => n2 * n1
-  end.
 
 Fixpoint run (stk : list nat) (instrs : list instruction) : list nat :=
   match instrs with
@@ -123,7 +117,8 @@ Proof. reflexivity. Qed.
 
 (*Exercise 4.6*)
 
-Lemma run_composite : forall e instrs' stk, run stk (compile e ++ instrs') = run ((eval e) :: stk) instrs'.
+Lemma run_composite : forall e instrs' stk,
+  run stk (compile e ++ instrs') = run ((eval e) :: stk) instrs'.
 Proof.
   intros e.
   induction e; intros. {
@@ -167,7 +162,8 @@ Definition decompile : list instruction -> option exp := fun instrs =>
 
 (* Exercise 4.8 *)
 
-Lemma assemble_composite : forall e instrs' stk, assemble stk (compile e ++ instrs') = assemble (e :: stk) instrs'.
+Lemma assemble_composite : forall e instrs' stk,
+  assemble stk (compile e ++ instrs') = assemble (e :: stk) instrs'.
 Proof.
   intros e.
   induction e; intros. {
@@ -188,6 +184,8 @@ Proof.
 Qed.
 
 (*Exercise 4.9*)
+
+(*Compile_decompile*)
 
 Lemma map_concat {T1 T2 : Type}: forall (f : T1 -> T2) a b,
   map f (a ++ [b]) = (map f a) ++ [f b].
@@ -237,3 +235,82 @@ Proof.
   induction e;
   apply assemble_singleton in Eass; assumption.
 Qed.
+
+(*Abstraction*)
+
+
+
+Fixpoint trans {T} `{Algebra T} (stk : list T) (instrs : list instruction) : list T :=
+  match instrs with
+    | [] => stk
+    | (IPush n) :: instrs' => trans alg ((apply_const n) :: stk) instrs'
+    | (IUnOp op) :: instrs' =>
+      match stk with
+      | n :: stk' => trans alg ((alg.(apply_unop) op n) :: stk') instrs'
+      | _ => []
+      end
+    | (IBinOp op) :: instrs' =>
+      match stk with
+      | n1 :: n2 :: stk' => trans alg ((alg.(apply_binop) op n1 n2) :: stk') instrs'
+      | _ => []
+      end
+    end.
+
+  Class Algebra (T : Type) := {
+  apply_const : nat -> T ;
+  apply_unop : unop -> T -> T ;
+  apply_binop : binop -> T -> T -> T ;
+  trans_composite : trans alg stk (compile e ++ instrs') = trans alg (e :: stk) instrs'
+}.
+
+Definition interpret {T} (alg : @Algebra T) : list instruction -> option T := fun instrs =>
+  match (trans alg [] instrs) with
+  | x :: nil => Some x
+  | _ => None
+  end.
+
+Definition nat_alg : Algebra :={|
+  apply_const n := n ;
+  apply_unop op n := eval_unop op n ;
+  apply_binop op n1 n2 := eval_binop op n1 n2
+|}.
+
+Definition exp_alg : Algebra :={|
+  apply_const n := ENat n ;
+  apply_unop op n := EUnOp op n ;
+  apply_binop op n1 n2 := EBinOp op n1 n2
+|}.
+
+Lemma trans_composite : forall e alg instrs' stk,
+  alg = nat_alg \/ alg = exp_alg ->
+  trans alg stk (compile e ++ instrs') = trans alg (e :: stk) instrs'.
+Proof.
+  intros e.
+  induction e; intros. {
+    reflexivity.
+  } {
+    destruct u; simpl; rewrite <- app_assoc; rewrite IHe; reflexivity.
+  } {
+    destruct b; simpl; rewrite <- app_assoc; rewrite <- app_assoc; rewrite IHe1; rewrite IHe2; reflexivity.
+  }
+Qed.
+
+Lemma interpret_correct : forall e, decompile (compile e) = Some e.
+Proof.
+  induction e; try reflexivity; [
+    destruct u |
+    destruct b
+  ]; simpl; unfold decompile; repeat rewrite assemble_composite; reflexivity.
+Qed.
+
+Definition vm : list instruction -> option nat := fun instrs =>
+  match (run [] instrs) with
+  | n :: nil => Some n
+  | _ => None
+  end.
+
+Definition decompile : list instruction -> option exp := fun instrs => 
+  match (assemble [] instrs) with
+  | e :: nil => Some e
+  | _ => None
+  end.
