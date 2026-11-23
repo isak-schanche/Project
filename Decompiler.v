@@ -76,14 +76,14 @@ Fixpoint run (stk : list nat) (instrs : list instruction) : list nat :=
   match instrs with
   | [] => stk
   | (IPush n) :: instrs' => run (n :: stk) instrs'
-  | (IUnOp o) :: instrs' =>
+  | (IUnOp op) :: instrs' =>
     match stk with
-    | n :: stk' => run ((eval_unop o n) :: stk') instrs'
+    | n :: stk' => run ((eval_unop op n) :: stk') instrs'
     | _ => []
     end
-  | (IBinOp o) :: instrs' =>
+  | (IBinOp op) :: instrs' =>
     match stk with
-    | n1 :: n2 :: stk' => run ((eval_binop o n1 n2) :: stk') instrs'
+    | n1 :: n2 :: stk' => run ((eval_binop op n1 n2) :: stk') instrs'
     | _ => []
     end
   end.
@@ -121,22 +121,14 @@ Proof. reflexivity. Qed.
 Lemma run_composite : forall e instrs' stk,
   run stk (compile e ++ instrs') = run ((eval e) :: stk) instrs'.
 Proof.
-  intros e.
-  induction e; intros. {
-    reflexivity.
-  } {
-    simpl; rewrite <- app_assoc; rewrite IHe; reflexivity.
-  } {
-    simpl; rewrite <- app_assoc; rewrite <- app_assoc; rewrite IHe1; rewrite IHe2; reflexivity.
-  }
+  intros e. induction e; intros; try reflexivity;
+  simpl; repeat rewrite <- app_assoc; [rewrite IHe | rewrite IHe1, IHe2]; reflexivity.
 Qed.
 
 Lemma vm_correct : forall e, vm (compile e) = Some (eval e).
 Proof.
-  induction e; try reflexivity; [
-    destruct u |
-    destruct b
-  ]; simpl; unfold vm; repeat rewrite run_composite; reflexivity.
+  induction e; try reflexivity; [destruct u | destruct b];
+  simpl; unfold vm; repeat rewrite run_composite; reflexivity.
 Qed.
 
 (* Exercise 4.7 *)
@@ -145,7 +137,8 @@ Fixpoint assemble (stk : list exp) (instrs : list instruction) : list exp :=
   match instrs with
   | [] => stk
   | (IPush n)::instrs' => assemble ((ENat n)::stk) instrs'
-  | (IUnOp op)::instrs' => match stk with
+  | (IUnOp op)::instrs' =>
+    match stk with
     | n :: stk' => assemble ((EUnOp op n) :: stk') instrs'
     | _ => []
     end
@@ -166,22 +159,14 @@ Definition decompile (instrs : list instruction) : option exp :=
 Lemma assemble_composite : forall e instrs' stk,
   assemble stk (compile e ++ instrs') = assemble (e :: stk) instrs'.
 Proof.
-  intros e.
-  induction e; intros. {
-    reflexivity.
-  } {
-    simpl; rewrite <- app_assoc; rewrite IHe; reflexivity.
-  } {
-    simpl; rewrite <- app_assoc; rewrite <- app_assoc; rewrite IHe1; rewrite IHe2; reflexivity.
-  }
+  intros e. induction e; intros; try reflexivity;
+  simpl; repeat rewrite <- app_assoc; [rewrite IHe | rewrite IHe1, IHe2]; reflexivity.
 Qed.
 
 Lemma decompile_correct : forall e, decompile (compile e) = Some e.
 Proof.
-  induction e; try reflexivity; [
-    destruct u |
-    destruct b
-  ]; simpl; unfold decompile; repeat rewrite assemble_composite; reflexivity.
+  induction e; try reflexivity; [destruct u | destruct b];
+  simpl; unfold decompile; repeat rewrite assemble_composite; reflexivity.
 Qed.
 
 (*Exercise 4.9*)
@@ -191,19 +176,15 @@ Qed.
 Lemma map_concat {T1 T2 : Type}: forall (f : T1 -> T2) a b,
   map f (a ++ [b]) = (map f a) ++ [f b].
 Proof.
-  intros. induction a. {
-    reflexivity.
-  } {
-    simpl. rewrite IHa. reflexivity.
-  }
+  intros. induction a; [|simpl; rewrite IHa]; reflexivity.
 Qed.
 
 Lemma assemble_singleton : forall e stk ins,
 assemble stk ins = [e] -> compile e = concat (map compile (rev stk)) ++ ins.
 Proof.
   intros. generalize dependent stk. induction ins; intros. {
-    simpl. destruct stk; try discriminate.
-    destruct stk; try discriminate. simpl in H. injection H as H'. subst.
+    do 2 (destruct stk; try discriminate).
+    injection H as H'. subst.
     simpl. repeat rewrite app_nil_r. reflexivity.
   } {
     destruct a;
@@ -268,12 +249,9 @@ Class Algebra (T : Type) `{TransAlgebra T} := {
 }.
 
 Ltac trans_composite_proof :=
-intros e; induction e as [ n | u e IHe | b e1 IHe1 e2 IHe2]; intros;
-    [ reflexivity
-    | simpl; rewrite <- app_assoc; rewrite IHe; reflexivity
-    | simpl; rewrite <- app_assoc; rewrite <- app_assoc;
-      rewrite IHe1; rewrite IHe2; reflexivity
-    ].
+  intros e; induction e as [ n | u e IHe | b e1 IHe1 e2 IHe2]; intros;
+  try reflexivity; simpl; repeat rewrite <- app_assoc;
+  [rewrite IHe | rewrite IHe1, IHe2]; reflexivity.
 
 Instance trans_nat_alg : TransAlgebra nat := {
   apply_const n := n ;
@@ -303,10 +281,8 @@ Definition interpret {T} `{Algebra T} (instrs : list instruction) : option T :=
 
 Lemma interpret_correct {T} `{Algebra T} : forall e, interpret (compile e) = Some e.
 Proof.
-  induction e; try reflexivity; [
-    destruct u |
-    destruct b
-  ]; simpl; unfold interpret; repeat rewrite trans_composite; reflexivity.
+  induction e; try reflexivity; [destruct u | destruct b];
+  simpl; unfold interpret; repeat rewrite trans_composite; reflexivity.
 Qed.
 
 Definition vm' := @interpret nat _ _.
@@ -314,7 +290,6 @@ Definition decompile' := @interpret exp _ _.
 
 Compute (vm' example_2_compiled).
 Compute (decompile' example_2_compiled).
-
 
 Lemma xxxx : vm' = vm.
 Proof.
