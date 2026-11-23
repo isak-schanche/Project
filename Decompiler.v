@@ -1,5 +1,6 @@
 Require Import List.
 Import ListNotations.
+Require Import Logic.FunctionalExtensionality.
 
 Inductive unop := OSucc | OPred.
 Inductive binop := OPlus | OMult.
@@ -313,3 +314,24 @@ Definition decompile' := @interpret exp _ _.
 
 Compute (vm' example_2_compiled).
 Compute (decompile' example_2_compiled).
+
+
+Lemma xxxx : vm' = vm.
+Proof.
+  apply functional_extensionality.
+  intros. unfold vm, vm', interpret. induction x. {
+    reflexivity.
+  } {
+    simpl. induction a; try reflexivity. destruct x. {
+      reflexivity.
+    } {
+      simpl. induction i; try reflexivity. {
+        destruct x; try reflexivity. {
+          simpl. induction i; try reflexivity. {
+             
+          }
+        } 
+      }
+    }
+    
+  }
